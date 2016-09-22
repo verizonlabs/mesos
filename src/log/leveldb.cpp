@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #include <glog/logging.h>
@@ -45,13 +46,11 @@ public:
       const leveldb::Slice& a,
       const leveldb::Slice& b) const
   {
-    // TODO(benh): Use varint comparator.
-    LOG(FATAL) << "Unimplemented";
-    // uint64_t left = position(a);
-    // uint64_t right = position(b);
-    // if (left < right) return -1;
-    // if (left == right) return 0;
-    // if (left > right) return 1;
+    uint64_t left = position(a);
+    uint64_t right = position(b);
+    if (left < right) return -1;
+    if (left == right) return 0;
+    if (left > right) return 1;
     UNREACHABLE();
   }
 
@@ -74,11 +73,23 @@ public:
   {
     // Intentional no-op.
   }
+
+  // Returns the position as represented in the specified slice
+  // (performing a decrement as necessary to determine the actual
+  // position represented).
+  static uint64_t position(const leveldb::Slice& s)
+  {
+    uint64_t position;
+    google::protobuf::io::ArrayInputStream _stream(s.data(), s.size());
+    google::protobuf::io::CodedInputStream stream(&_stream);
+    bool success = stream.ReadVarint64(&position);
+    CHECK(success);
+    return position - 1; // Actual position is less 1 of stringified.
+  }
 };
 
 
-// TODO(benh): Use varint comparator.
-// static Varint64Comparator comparator;
+static Varint64Comparator comparator;
 
 
 // Returns a string representing the specified position. Note that we
@@ -87,20 +98,12 @@ public:
 // DEPRECATED!), or the metadata (Record::Metadata).
 static string encode(uint64_t position, bool adjust = true)
 {
-  // Adjusted stringified represenation is plus 1 of actual position.
+  string s;
+  google::protobuf::io::StringOutputStream _stream(&s);
+  google::protobuf::io::CodedOutputStream stream(&_stream);
   position = adjust ? position + 1 : position;
-
-  // TODO(benh): Use varint encoding for VarInt64Comparator!
-  // string s;
-  // google::protobuf::io::StringOutputStream _stream(&s);
-  // google::protobuf::io::CodedOutputStream stream(&_stream);
-  // position = adjust ? position + 1 : position;
-  // stream.WriteVarint64(position);
-  // return s;
-
-  Try<string> s = strings::format("%.*d", 10, position);
-  CHECK_SOME(s);
-  return s.get();
+  stream.WriteVarint64(position);
+  return s;
 }
 
 
@@ -113,16 +116,12 @@ static string encode(uint64_t position, bool adjust = true)
 // from the compiler.
 // static uint64_t decode(const leveldb::Slice& s)
 // {
-//   // TODO(benh): Use varint decoding for VarInt64Comparator!
-//   // uint64_t position;
-//   // google::protobuf::io::ArrayInputStream _stream(s.data(), s.size());
-//   // google::protobuf::io::CodedInputStream stream(&_stream);
-//   // bool success = stream.ReadVarint64(&position);
-//   // CHECK(success);
-//   // return position - 1; // Actual position is less 1 of stringified.
-//   Try<uint64_t> position = numify<uint64_t>(string(s.data(), s.size()));
-//   CHECK_SOME(position);
-//   return position.get() - 1; // Actual position is less 1 of stringified.
+//   uint64_t position;
+//   google::protobuf::io::ArrayInputStream _stream(s.data(), s.size());
+//   google::protobuf::io::CodedInputStream stream(&_stream);
+//   bool success = stream.ReadVarint64(&position);
+//   CHECK(success);
+//   return position - 1; // Actual position is less 1 of stringified.
 // }
 
 
@@ -143,23 +142,7 @@ Try<Storage::State> LevelDBStorage::restore(const string& path)
 {
   leveldb::Options options;
   options.create_if_missing = true;
-
-  // TODO(benh): Can't use varint comparator until bug discussed at
-  // groups.google.com/group/leveldb/browse_thread/thread/17eac39168909ba7
-  // gets fixed. For now, we are using the default byte-wise
-  // comparator and *assuming* that the encoding from unsigned long to
-  // string produces a stable ordering. Checks below.
-  // options.comparator = &comparator;
-
-  const string& one = encode(1);
-  const string& two = encode(2);
-  const string& ten = encode(10);
-
-  CHECK(leveldb::BytewiseComparator()->Compare(one, two) < 0);
-  CHECK(leveldb::BytewiseComparator()->Compare(two, one) > 0);
-  CHECK(leveldb::BytewiseComparator()->Compare(one, ten) < 0);
-  CHECK(leveldb::BytewiseComparator()->Compare(ten, two) > 0);
-  CHECK(leveldb::BytewiseComparator()->Compare(ten, ten) == 0);
+  options.comparator = &comparator;
 
   Stopwatch stopwatch;
   stopwatch.start();
