@@ -68,6 +68,11 @@ AC_CONFIG_FILES([3rdparty/gmock_sources.cc])
 # Optional features.
 ###############################################################################
 
+AC_ARG_ENABLE([sanitize],
+              AS_HELP_STRING([--enable-sanitize],
+                             [sanitize program execution during runtime]),
+                             [], [enable_sanitize=no])
+
 AC_ARG_ENABLE([hardening],
               AS_HELP_STRING([--disable-hardening],
                              [disables security measures such as stack
@@ -586,6 +591,9 @@ libsubversion-1 is required for stout tests to build.
 ###############################################################################
 # Compiler checks.
 ###############################################################################
+
+# Check to see if we should sanitize or not.
+AM_CONDITIONAL([ENABLE_SANITIZE], [test x"$enable_sanitize" = "xyes"])
 
 # Check to see if we should harden or not.
 AM_CONDITIONAL([ENABLE_HARDENING], [test x"$enable_hardening" = "xyes"])

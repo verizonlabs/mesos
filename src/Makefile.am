@@ -116,6 +116,16 @@ AM_CXXFLAGS += @STACK_PROTECTOR@
 AM_CXXFLAGS += -fPIC -fPIE
 endif
 
+if ENABLE_SANITIZE
+
+#Enable memory sanitizer
+AM_CXXFLAGS += -fsanitize=address
+#Enable leak sanitizer
+AM_CXXFLAGS += -fsanitize=leak
+#Enable undefined behaviour sanitizer
+AM_CXXFLAGS += -fsanitize=undefined
+endif
+
 AM_LIBS = $(PTHREAD_LIBS)
 
 # Setup CPPFLAGS that are used for most source files.

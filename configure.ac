@@ -148,6 +148,11 @@ AC_CONFIG_FILES([mpi/mpiexec-mesos], [chmod +x mpi/mpiexec-mesos])
 # Optional features.
 ###############################################################################
 
+AC_ARG_ENABLE([sanitize],
+              AS_HELP_STRING([--enable-sanitize],
+                             [sanitize program execution during runtime]),
+                             [], [enable_sanitize=no])
+
 AC_ARG_ENABLE([hardening],
               AS_HELP_STRING([--disable-hardening],
                              [disables security measures such as stack
@@ -432,6 +437,9 @@ AS_IF([test "x${ac_cv_env_CXXFLAGS_set}" = "x"],
 ###############################################################################
 # Compiler checks.
 ###############################################################################
+
+# Check to see if we should sanitize or not.
+AM_CONDITIONAL([ENABLE_SANITIZE], [test x"$enable_sanitize" = "xyes"])
 
 # Check to see if we should harden or not.
 AM_CONDITIONAL([ENABLE_HARDENING], [test x"$enable_hardening" = "xyes"])
